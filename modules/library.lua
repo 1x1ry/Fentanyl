@@ -3354,8 +3354,8 @@ function library:Loader(options)
         callback = function() end,
     });
 
-    local sizeX = 310;
-    local sizeY = 123;
+    local sizeX = options.sizeX or 310;
+    local sizeY = options.sizeY or 123;
 
     local window = Render:Create("Square", {
         Size = newUDim2(0, sizeX, 0, 22),
