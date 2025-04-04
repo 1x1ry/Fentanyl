@@ -26,23 +26,23 @@ end
 
 function Library.Color(Color1, Alpha1, Color2, Alpha2)
     for _, line in pairs(Library.Lines) do
-        line.Color = Color1 
-        line.Transparency = Alpha1
+        line.Color = Library.VisColor[1] 
+        line.Transparency = Library.VisColor[2] 
     end
 
     for _, outline in pairs(Library.Outlines) do
-        outline.Color = Color2 
-        outline.Transparency = Alpha2
+        outline.Color = Library.OutlineColor[1] 
+        outline.Transparency = Library.OutlineColor[2] 
     end
 end
 
 function Library.Thickness(Thickness)
     for _, line in pairs(Library.Lines) do
-        line.Thickness = Thickness
+        line.Thickness = Library.Thickness
     end
 
     for _, outline in pairs(Library.Outlines) do
-        outline.Thickness = Thickness + 2
+        outline.Thickness = Library.Thickness + 2
     end
 end
 
