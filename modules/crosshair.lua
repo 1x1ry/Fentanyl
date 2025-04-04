@@ -14,44 +14,6 @@ local Library = {
     Outlines = { Top = Drawing.new("Line"), Bottom = Drawing.new("Line"), Left = Drawing.new("Line"), Right = Drawing.new("Line")},
 }
 
-function Library.Visible(Lines, Outlines)
-    for _, line in pairs(Library.Lines) do
-        line.Visible = Lines
-    end
-
-    for _, outline in pairs(Library.Outlines) do
-        outline.Visible = Outlines
-    end
-end 
-
-function Library.Color(Color1, Alpha1, Color2, Alpha2)
-    for _, line in pairs(Library.Lines) do
-        line.Color = Library.VisColor[1] 
-        line.Transparency = Library.VisColor[2] 
-    end
-
-    for _, outline in pairs(Library.Outlines) do
-        outline.Color = Library.OutlineColor[1] 
-        outline.Transparency = Library.OutlineColor[2] 
-    end
-end
-
-function Library.Thickness(Thickness)
-    for _, line in pairs(Library.Lines) do
-        line.Thickness = Library.Thickness
-    end
-
-    for _, outline in pairs(Library.Outlines) do
-        outline.Thickness = Library.Thickness + 2
-    end
-end
-
-function Library.Resize(newGap, newLength)
-    Library.Gap = newGap
-    Library.Length = newLength
-    Library.Update()
-end
-
 function Library.Update()
     local centerX, centerY = workspace.CurrentCamera.ViewportSize.X / 2 + Library.Offset[1], workspace.CurrentCamera.ViewportSize.Y / 2 + Library.Offset[2]
     local gap, length = Library.Gap, Library.Length
@@ -136,10 +98,6 @@ function Library.Destroy()
         outline:Remove()
     end
 end
-
-Library.Visible(true, true)
-Library.Color(Library.VisColor[1], Library.VisColor[2], Library.OutlineColor[1], Library.OutlineColor[2])
-Library.Thickness(Library.Thickness)
 
 for _, line in pairs(Library.Lines) do
     line.ZIndex = 2
