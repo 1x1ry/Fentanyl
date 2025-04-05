@@ -1,228 +1,378 @@
-local Services, Utility = {}, {
+local Services, Library = {}, {
     Directory = "Fentanyl",
     Repository = "Fentanyl",
     
     Connections = {},
     Instances = {},
-    Drawings = {},
-    
-    ClosestPlayer,
+    Drawings = {}, 
 
-    FrameTimer = tick(),
-    FrameCounter = 0,
-    FPS = 60,
+    Events = {
+        OnDied = {},
+        CharacterAdded = {},
+        PlayerAdded = {},
+        PlayerRemoving = {},
+        Unload = {}
+    },
 
-    RaycastParameters = RaycastParams.new(),
+    Clients = {
+        All = {},
+        Alive = {}
+    },
+
+    FontCache = {},
+    Typeface = {}
+
 }; setmetatable(Services, {
     __index = function(self, key)
         return cloneref and cloneref(game:GetService(key)) or game:GetService(key)
     end
 })
 
-local ReplicatedStorage, UserInputService, RunService, TweenService, HttpService, MarketplaceService, Lighting, CoreGui, Stats, Players = Services.ReplicatedStorage, Services.UserInputService, Services.RunService, Services.TweenService, Services.HttpService, Services.MarketplaceService, Services.Lighting, Services.CoreGui, Services.Stats, Services.Players
-local LocalPlayer, Camera = Players.LocalPlayer, workspace.CurrentCamera 
+local Players = Services.Players 
+local RunService = Services.RunService
+local ReplicatedStorage = Services.ReplicatedStorage
+local TweenService = Services.TweenService
+local HttpService = Services.HttpService
+local CoreGui = Services.CoreGui
+local UserInputService = Services.UserInputService
+
+local LocalPlayer = Players.LocalPlayer
 local Mouse = UserInputService:GetMouseLocation()
+local Camera = workspace.CurrentCamera
 
-do 
+function Library:SafeCall(func, ...)
+    local Success, Result = pcall(func, ...)
+    if not Success then
+        return false, Result -- Return false and the error message
+    end
+    return true, Result -- Return true and the result if no error
+end
 
-    do --## Main ## 
-        function Utility:newInstance(Config : table) 
-            local Instance = Instance.new(Config.Instance or Config.Type or "Frame")
-            local Index = Config.Index or #self.Instances
-            local Properties = Config.Properties or Config.Config or {}
+function Library:Fetch(url, method, headers, body)
+    local response = request({
+        Url = url,
+        Method = method or "GET",
+        Headers = headers or {},
+        Body = body or nil
+    })
 
-            for _, v in next, Properties do
-                Instance[_] = v
-            end 
+    return response.Body and HttpService:JSONDecode(response.Body) or response
+end
 
-            self.Instances[Index] = Instance
+function Library:Loadstring(Url)
+    local Success, Result = Library:SafeCall(function()
+        return loadstring(game:HttpGet(Url, true))()
+    end)
 
-            return Instance
-        end
-
-        function Utility:newDrawing(Type, Properties)
-            local Drawing = Drawing.new(Type)
-
-            for index, value in ipairs(Properties) do 
-                Drawing[index] = value
-            end; table.insert(self.Drawings, Drawing)
-
-            return Drawing 
-        end
-
-        function Utility:newSignal(Config : table)
-            local Signal = Config.Signal or Services.RunService.RenderStepped 
-            local Index = Config.Index or #self.Connections
-            local Function = Config.Function or Config.Func or Config.Callback or function() end 
-
-            local Connection = Signal:Connect(Function)
-
-            self.Connections[Index] = Connection
-
-            return Connection
-        end
+    if not Success then 
+        warn("Failed to load string from URL: " .. Url .. "\nError: " .. Result)
+        return
     end
 
-    do --## Core ##
-        Utility.RaycastParameters.FilterDescendantsInstances = {LocalPlayer.Character}
-        Utility.RaycastParameters.FilterType = Enum.RaycastFilterType.Blacklist
-        function Utility:isVisible(Start, Endpoint, Expectation)
+    return Result
+end 
 
-            local Direction = (Endpoint - Start).Unit
-            local Distance = (Endpoint - Start).Magnitude
-            local Result = workspace:Raycast(Start, Direction * Distance, Utility.RaycastParameters)
+function Library:GetExecutorName()
+    return identifyexecutor and identifyexecutor() or "Shitsploit"
+end 
 
-            if Result == nil then 
-                return true
-            end 
+function Library:Instance(Class : string, Parent : instance, Properties : table)
+    local Instance = Instance.new(Class)
 
-            return (typeof(Expectation) == "string" and (Result.Instance.Name == Expectation)) or Result.Instance == Expectation
-        end 
+    if Parent then 
+        Instance.Parent = Parent 
+    else
+        Instance.Parent = CoreGui 
+    end 
 
-        function Utility:setRaycastParams(Table)
-            for _, v in ipairs(Table) do 
-                Utility.RaycastParameters[_] = v
-            end
-        end 
-
-
-        function Utility:isAlive(Player : Player)
-            if Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
-                if Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then 
-                    return true
-                end
-            end
-            
-            return false
-        end
-        
-        function Utility:isFriendly(Player : Player)
-            return (Player.Team == LocalPlayer.Team)
-        end
-
-        function Utility:hasForcefield(Player : Player)
-            return false
-        end 
-
-        function Utility:getClosestPlayer(Function)
-            local extraCheck = Function or function() return true end
-            local closestPlayer = nil
-            local shortestDistance = math.huge
-
-            for _, Player in ipairs(Players:GetPlayers()) do
-                if Player == LocalPlayer then continue end 
-                if self:isAlive(Player) then
-                    local Position = Player.Character.HumanoidRootPart.Position
-                    local pos, OnScreen = Camera:WorldToViewportPoint(Position)
-                    local mouseLocation = Mouse -- Dynamically fetch mouse position
-                    local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(mouseLocation.X, mouseLocation.Y)).magnitude
-                    if extraCheck(Player, magnitude) and magnitude < shortestDistance and OnScreen then
-                        closestPlayer = Player
-                        shortestDistance = magnitude
-                    end
-                end
-            end
-
-            return closestPlayer
-        end
-
-        function Utility:getClosestPart(Player: Instance, List: Table)
-            local shortestDistance = math.huge
-            local closestPart
-            local position 
-            if Utility:isAlive(Player) then
-                for _, Value in pairs(Player.Character:GetChildren()) do
-                    if Value:IsA("BasePart") then 
-                        local pos = Camera:WorldToViewportPoint(Value.Position)
-                        local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).magnitude
-
-                            if magnitude < shortestDistance and table.find(List, Value.Name) then
-                                closestPart = Value
-                                shortestDistance = magnitude
-                                position = pos
-                            end
-                        end
-                    end 
-                return closestPart, position
-            end
-        end 
-
-        function Utility:getBodyParts(Character, RootPart, Indexes, Hitboxes)
-            local Parts = {}
-            local Hitboxes = Hitboxes or {"Head", "Torso", "Arms", "Legs"}
-
-            for Index, Part in ipairs(Character:GetChildren()) do
-                if Part:IsA("BasePart") and Part ~= RootPart then
-                    if table.find(Hitboxes, "Head") and Part.Name:lower():find("head") then
-                        table.insert(Parts, Part.Name)
-                    elseif table.find(Hitboxes, "Torso") and Part.Name:lower():find("torso") then
-                        table.insert(Parts, Part.Name)
-                    elseif table.find(Hitboxes, "Arms") and Part.Name:lower():find("arm") then
-                        table.insert(Parts, Part.Name)
-                    elseif table.find(Hitboxes, "Legs") and Part.Name:lower():find("leg") then
-                        table.insert(Parts, Part.Name)
-                    elseif (table.find(Hitboxes, "Arms") and Part.Name:lower():find("hand")) or (table.find(Hitboxes, "Legs") and Part.Name:lower():find("foot")) then
-                        table.insert(Parts, Part.Name)
-                    end
-                end
-            end
-
-            return Parts
-        end
-
-
-        function Utility:getPlayerHealth(Player)
-            if Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
-                return Player.Character:FindFirstChildOfClass("Humanoid").Health
-            end
-            return 0
-        end
-
-        function Utility:getDistance(Player1, Player2)
-            if Player1.Character and Player2.Character then
-                local pos1 = Player1.Character:FindFirstChild("HumanoidRootPart").Position
-                local pos2 = Player2.Character:FindFirstChild("HumanoidRootPart").Position
-                return (pos1 - pos2).Magnitude
-            end
-
-            return math.huge
-        end
-
-        function Utility:bindKeyEvent(Config : table)
+    if Properties then 
+        for Index, Value in pairs(Properties) do 
+            Instance[Index] = Value 
         end
     end 
 
-    do --## Miscallaenous ## 
-        function Utility:worldToViewportPoint(Object)
-            return workspace.CurrentCamera:WorldToViewportPoint(Object)
+    table.insert(self.Instances, Instance)
+
+    return Instance
+end
+
+function Library:Draw(Class : string, Properties : table)
+    local Drawing = Drawing.new(Class)
+
+    if Properties then 
+        for Index, Value in pairs(Properties) do 
+            Drawing[Index] = Value 
         end
+    end 
 
-        function Utility:worldToScreenPoint(Object)
-            return workspace.CurrentCamera:WorldToScreenPoint(Object)
-        end
+    table.insert(self.Drawings, Drawing)
 
-        function Utility:getMouseLocation()
-            return localPlayer:GetMouseLocation()
-        end 
+    return Drawing
+end
 
-        function Utility:getPlayers()
-            return Players:GetPlayers()
-        end
-    end
+function Library:Connect(Index : string, Connection : Instance, Callback : function)
+    local Connection = Connection:Connect(Callback)
+    self.Connections[Index or #self.Connections] = Connection
+    return Connection 
+end
 
-    function Utility:Unload()
-        for i, v in ipairs(self.Connections) do 
-            v:Disconnect()
-        end 
-
-        for i, v in ipairs(self.Drawings) do 
-            v:Remove()
-        end 
-
-        for i, v in ipairs(self.Instances) do 
-            v:Destroy()
-        end 
-
+function Library:Disconnect(Index : string)
+    if self.Connections[Index] then 
+        self.Connections[Index]:Disconnect()
+        self.Connections[Index] = nil 
     end 
 end
-return Services, Utility
+
+function Library:GetCharacter(Player)
+    return Player:FindFirstChild("Character")
+end 
+
+function Library:GetRoot(Character)
+    return Character:FindFirstChild("HumanoidRootPart")
+end 
+
+function Library:GetHumanoid(Character)
+    return Character:FindFirstChildOfClass("Humanoid")
+end
+
+function Library:GetTeam(Player) 
+    return Player.Team
+end
+
+function Library:GetStatus(Player)
+    local Character = self:GetCharacter(Player)
+    if Character and self:GetRoot(Character) and self:GetHumanoid(Character) then
+        return (self:GetHumanoid(Character).Health > 0)
+    end
+
+    return false
+end
+
+function Library:IsFriendly(Player)
+    return (self:GetTeam(Player) == self:GetTeam(LocalPlayer))
+end
+
+function Library:IsLocalPlayer(Player)
+    return Player == LocalPlayer
+end
+
+function Library:WorldToViewportPoint(Position)
+    return Camera:WorldToViewportPoint(Position)
+end
+
+function Library:WorldToScreenPoint(Position)
+    return Camera:WorldToScreenPoint(Position)
+end
+
+function Library:GetClosestPlayerByMouse(Valid, UseAlivePlayers)
+    local Table = (UseAlivePlayers and self.Clients.Alive) or Players:GetPlayers()
+    local ClosestPlayer 
+    local ClosestPosition
+    local ShortestDistance = math.huge 
+    local Check = Valid or function() return true end
+
+    for i, Player in ipairs(Table) do 
+        if self:IsLocalPlayer(Player) then continue end 
+        if not self:GetStatus(Player) then continue end 
+        if not Check(Player) then continue end
+        
+        local RootPosition = self:GetRoot(self:GetCharacter(Player)).Position
+        local ScreenPosition, OnScreen = self:WorldToViewportPoint(RootPosition)
+        local Magnitude = (Vector2.new(ScreenPosition.X, ScreenPosition.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+
+        if OnScreen and Magnitude < ShortestDistance then 
+            ClosestPlayer = Player 
+            ClosestPosition = ScreenPosition
+            ShortestDistance = Magnitude
+        end
+    end 
+
+    return ClosestPlayer, ClosestPosition
+end 
+
+function Library:GetClosestPartByMouse(Player, List)
+    local ClosestPart 
+    local ClosestPosition 
+    local ShortestDistance = math.huge 
+
+    for i, Part in ipairs(Player.Character:GetChildren()) do 
+        if Part:IsA("BasePart") and table.find(List, Part) then 
+            local ScreenPosition, OnScreen = self:WorldToViewportPoint(Part.Position)
+            local Magnitude = (Vector2.new(ScreenPosition.X, ScreenPosition.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+
+            if OnScreen and Magnitude < ShortestDistance then 
+                ClosestPart = Part 
+                ClosestPosition = ScreenPosition
+                ShortestDistance = Magnitude
+            end
+        end
+    end
+    return ClosestPart, ClosestPosition
+end 
+
+function Library:ListBodyParts(Character, Rootpart, Indexes, Hitboxes)
+    local Parts = {}
+    local Hitboxes = Hitboxes or {"Head", "Torso", "Arms", "Legs"}
+
+    for _, Part in ipairs(Character:GetChildren()) do 
+        if Part:IsA("BasePart") and Part ~= Rootpart then 
+            local Name = string.lower(Part.Name)
+            local Index = Indexes and Part.Name or #Parts + 1
+
+            if table.find(Hitboxes, "Head") and Name:find("head") then 
+                Parts[Index] = Part
+            elseif table.find(Hitboxes, "Torso") and Name:find("torso") then 
+                Parts[Index] = Part
+            elseif table.find(Hitboxes, "Arms") and Name:find("arm") then 
+                Parts[Index] = Part
+            elseif (table.find(Hitboxes, "Arms") and Name:find("hand")) or (table.find(Hitboxes, "Legs") and Name:lower():find("foot")) then
+                Parts[Index] = Part
+            end
+        end 
+    end 
+
+    return Parts
+end
+
+function Library:BindEvent(Event, Callback)
+    if self.Events[Event] then 
+        table.insert(self.Events[Event], Callback)
+    end 
+end
+
+function Library:RegisterFont(baseDirectory, fontInfo)
+    assert(type(baseDirectory) == "string", "Base directory must be a string")
+    assert(type(fontInfo) == "table", "Font info must be a table")
+    assert(fontInfo.name, "Font must have a name")
+    assert(fontInfo.link, "Font must have a download link")
+    
+    fontInfo.weight = fontInfo.weight or "Regular"
+    fontInfo.style = fontInfo.style or "Normal"
+    
+    if not isfolder(baseDirectory) then
+        makefolder(baseDirectory)
+    end
+    
+    local fontsDir = baseDirectory .. "/fonts"
+    if not isfolder(fontsDir) then
+        makefolder(fontsDir)
+    end
+    
+    local fontName = fontInfo.name:gsub("%s+", "_"):lower()
+    local rawFontPath = fontsDir .. "/" .. fontName .. ".ttf"
+    local encodedFontPath = fontsDir .. "/" .. fontName .. "_encoded.ttf"
+    
+    if not ensureFile(rawFontPath, fontInfo.link) then
+        return nil
+    end
+    
+    local fontDescriptor = {
+        name = fontInfo.name,
+        faces = {
+            {
+                name = fontInfo.weight,
+                weight = fontInfo.weight == "Bold" and 700 or 400,
+                style = fontInfo.style:lower(),
+                assetId = getcustomasset(rawFontPath)
+            }
+        }
+    }
+    
+    writefile(encodedFontPath, HttpService:JSONEncode(fontDescriptor))
+    
+    local weightEnum = Enum.FontWeight.Regular
+    if fontInfo.weight == "Bold" then
+        weightEnum = Enum.FontWeight.Bold
+    elseif fontInfo.weight == "Light" then
+        weightEnum = Enum.FontWeight.Light
+    end
+    
+    local cacheKey = fontInfo.name .. "-" .. fontInfo.weight .. "-" .. fontInfo.style
+    if not FontCache[cacheKey] then
+        FontCache[cacheKey] = Font.new(getcustomasset(encodedFontPath), weightEnum)
+    end
+    
+    return FontCache[cacheKey]
+end
+
+function Library:GetFont(fontName, weight, style)
+    weight = weight or "Regular"
+    style = style or "Normal"
+    
+    local cacheKey = fontName .. "-" .. weight .. "-" .. style
+    return FontCache[cacheKey]
+end
+
+function Library:Unload()
+    for _, Connection in ipairs(self.Connections) do 
+        Connection:Disconnect()
+    end
+
+    for _, Instance = ipairs(self.Instances) do 
+        Instance:Destroy()
+    end 
+
+    for _, Drawing in ipairs(self.Drawings) do 
+        Drawing:Remove()
+    end
+
+    for _, Callback in ipairs(self.Events.Unload) do 
+        Callback()
+    end
+
+end 
+
+Library:Connect("PlayerAdded", Players.PlayerAdded, function(Player)
+    if not Player or not Player:IsA("Player") then return end
+
+    table.insert(Library.Clients.All, Player)
+
+    for _, Callback in ipairs(Library.Events.PlayerAdded) do 
+        Callback(Player)
+    end
+
+    if Library:GetStatus(Player) then 
+        table.insert(Library.Clients.Alive, Player)
+    end
+
+    Player.CharacterAdded:Connect(function(Character)
+        if not Character or not Character:IsA("Model") then return end
+
+        for _, Callback in ipairs(Library.Events.CharacterAdded) do 
+            Callback(Player, Character)
+        end
+
+        local Humanoid = Character:WaitForChild("Humanoid", 5)
+        if not Humanoid then return end
+
+        Humanoid.Died:Connect(function()
+            local aliveIndex = table.find(Library.Clients.Alive, Player)
+            if aliveIndex then
+                table.remove(Library.Clients.Alive, aliveIndex)
+            end
+
+            for _, Callback in ipairs(Library.Events.OnDied) do 
+                Callback(Player, Character)
+            end
+        end)
+    end)
+end)
+
+Library:Connect("PlayerRemoving", Players.PlayerRemoving, function(Player)
+    if not Player or not Player:IsA("Player") then return end
+
+    local index = table.find(Library.Clients.All, Player)
+    if index then
+        table.remove(Library.Clients.All, index)
+    end
+
+    local aliveIndex = table.find(Library.Clients.Alive, Player)
+    if aliveIndex then
+        table.remove(Library.Clients.Alive, aliveIndex)
+    end
+
+    for _, Callback in ipairs(Library.Events.PlayerRemoving) do 
+        Callback(Player)
+    end
+end)
+
