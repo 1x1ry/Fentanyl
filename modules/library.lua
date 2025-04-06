@@ -708,8 +708,7 @@ local library = {
     notification_y = "bottom",
     watermark_x = "left",
     watermark_y = "top",
-    info_x = "right",
-    info_y = "top",
+    info_position = "Top Left Corner",
     font = worldtoscreen ~= nil and 1 or 2,
     font_size = 13,
     themes = {
@@ -3748,7 +3747,25 @@ end
 
 function library:ChangeInfoPosition(position)
     if self.Info then
-        self.Info.Position = newUDim2(self.info_x == "left" and 0 or 1, self.info_x == "left" and 16 or -(self.Info.AbsoluteSize.X + 16), self.info_y == "top" and 0 or 1, self.info_y == "top" and 16 or -36)
+        local xOffset, yOffset
+        -- Handle position cases
+        if position == "top left" then
+            xOffset = 16
+            yOffset = 16
+        elseif position == "middle" then
+            xOffset = 16
+            yOffset = (workspace.CurrentCamera.ViewportSize.Y / 2) - (self.Info.AbsoluteSize.Y / 2)
+        elseif position == "bottom left" then
+            xOffset = 16
+            yOffset = workspace.CurrentCamera.ViewportSize.Y - self.Info.AbsoluteSize.Y - 16
+        else
+            -- Default to "top left" if an invalid position is provided
+            xOffset = 16
+            yOffset = 16
+        end
+
+        -- Apply the calculated position
+        self.Info.Position = UDim2.new(0, xOffset, 0, yOffset)
     end
 end
 
@@ -3859,9 +3876,9 @@ function library:Info(str, title, img)
         local yOffset = self.info_y == "top" and 16 or -(totalHeight + 16)
 
         self.Info.Position = UDim2.new(
-            self.info_x == "left" and 0 or 1,
+            1,
             xOffset,
-            self.info_y == "top" and 0 or 1,
+            1,
             yOffset
         )
     end
@@ -5574,15 +5591,11 @@ function library:Load(options)
 
             info_section:Dropdown{
                 name = "Client Info Alignment",
-                default = library.info_y:gsub("^%l", upper) .. " " .. library.info_x:gsub("^%l", upper),
-                content = {"Top Left", "Top Right", "Bottom Left", "Bottom Right"},
+                default = "Middle",
+                content = {"Top Left", "Middle", "Bottom Left"},
                 flag = "client_alignment",
                 callback = function(alignment)
-                    if alignment then
-                        alignment = alignment:split(" ")
-                        local y, x = alignment[1], alignment[2]
-                        library:ChangeInfoPosition(x, y)
-                    end
+                    library:ChangeInfoPosition(string.lower(alignment))
                 end
             }
         end
