@@ -37,7 +37,6 @@ local CoreGui = Services.CoreGui
 local UserInputService = Services.UserInputService
 
 local LocalPlayer = Players.LocalPlayer
-local Mouse = UserInputService:GetMouseLocation()
 local Camera = workspace.CurrentCamera
 
 function Library:SafeCall(func, ...)
@@ -140,8 +139,8 @@ function Library:GetTeam(Player)
 end
 
 function Library:GetStatus(Player)
-    if Player:FindFirstChild("Character") then 
-        if Player.Character:FindFirstChild("HumanoidRootPart") and Player.Character:FindFirstChildOfClass("Humanoid") then 
+    if Player.Character then 
+        if Player.Character:FindFirstChild("HumanoidRootPart") and Player.Character:FindFirstChildOfClass("Humanoid") then
             if Player.Character.Humanoid.Health > 0 then 
                 return true 
             end 
@@ -167,20 +166,17 @@ function Library:WorldToScreenPoint(Position)
     return Camera:WorldToScreenPoint(Position)
 end
 
-function Library:GetClosestPlayerByMouse(Valid, UseAlivePlayers)
-    local Table = (UseAlivePlayers and self.Clients.Alive) or Players:GetPlayers()
+function Library:GetClosestPlayerByMouse(Valid)
+    local Table = Library.Clients.Alive
     local ClosestPlayer 
     local ClosestPosition
     local ShortestDistance = math.huge 
     local Check = Valid or function() return true end
-
-    for i, Player in ipairs(Table) do 
-        if self:IsLocalPlayer(Player) then continue end 
-        if not self:GetStatus(Player) then continue end 
+    for _, Player in ipairs(Table) do 
         if not Check(Player) then continue end
-        
-        local RootPosition = self:GetRoot(self:GetCharacter(Player)).Position
-        local ScreenPosition, OnScreen = self:WorldToViewportPoint(RootPosition)
+
+        local ScreenPosition, OnScreen = self:WorldToViewportPoint(Player.Character.HumanoidRootPart.Position)
+        local Mouse = UserInputService:GetMouseLocation()
         local Magnitude = (Vector2.new(ScreenPosition.X, ScreenPosition.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
 
         if OnScreen and Magnitude < ShortestDistance then 
@@ -193,14 +189,15 @@ function Library:GetClosestPlayerByMouse(Valid, UseAlivePlayers)
     return ClosestPlayer, ClosestPosition
 end 
 
-function Library:GetClosestPartByMouse(Player, List)
+function Library:GetClosestPartByMouse(List)
     local ClosestPart 
     local ClosestPosition 
     local ShortestDistance = math.huge 
 
-    for i, Part in ipairs(Player.Character:GetChildren()) do 
-        if Part:IsA("BasePart") and table.find(List, Part) then 
+    for _, Part in ipairs(List) do 
+        if Part:IsA("BasePart") then 
             local ScreenPosition, OnScreen = self:WorldToViewportPoint(Part.Position)
+            local Mouse = UserInputService:GetMouseLocation()
             local Magnitude = (Vector2.new(ScreenPosition.X, ScreenPosition.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
 
             if OnScreen and Magnitude < ShortestDistance then 
@@ -221,14 +218,13 @@ function Library:ListBodyParts(Character, Rootpart, Indexes, Hitboxes)
         if Part:IsA("BasePart") and Part ~= Rootpart then 
             local Name = string.lower(Part.Name)
             local Index = Indexes and Part.Name or #Parts + 1
-
-            if table.find(Hitboxes, "Head") and Name:find("head") then 
+            if table.find(Hitboxes, "Head") and Name:find("head") then
                 Parts[Index] = Part
             elseif table.find(Hitboxes, "Torso") and Name:find("torso") then 
                 Parts[Index] = Part
             elseif table.find(Hitboxes, "Arms") and Name:find("arm") then 
                 Parts[Index] = Part
-            elseif (table.find(Hitboxes, "Arms") and Name:find("hand")) or (table.find(Hitboxes, "Legs") and Name:lower():find("foot")) then
+            elseif table.find(Hitboxes, "Legs") and Name:find("leg") then 
                 Parts[Index] = Part
             end
         end 
@@ -385,7 +381,7 @@ for i, v in ipairs(Players:GetPlayers()) do
 
         if Library:GetStatus(v) then 
             table.insert(Library.Clients.Alive, v)
-        end 
+        end
     end 
 end 
 
