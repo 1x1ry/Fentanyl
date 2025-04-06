@@ -110,7 +110,7 @@ function Library:Draw(Class : string, Properties : table)
     return Drawing
 end
 
-function Library:Connect(Index : string, Connection : Instance, Callback : function)
+function Library:Connect(Index, Connection, Callback)
     local Connection = Connection:Connect(Callback)
     self.Connections[Index or #self.Connections] = Connection
     return Connection 
@@ -140,9 +140,12 @@ function Library:GetTeam(Player)
 end
 
 function Library:GetStatus(Player)
-    local Character = self:GetCharacter(Player)
-    if Character and self:GetRoot(Character) and self:GetHumanoid(Character) then
-        return (self:GetHumanoid(Character).Health > 0)
+    if Player:FindFirstChild("Character") then 
+        if Player.Character:FindFirstChild("HumanoidRootPart") and Player.Character:FindFirstChildOfClass("Humanoid") then 
+            if Player.Character.Humanoid.Health > 0 then 
+                return true 
+            end 
+        end
     end
 
     return false
@@ -308,7 +311,7 @@ function Library:Unload()
         Connection:Disconnect()
     end
 
-    for _, Instance = ipairs(self.Instances) do 
+    for _, Instance in ipairs(self.Instances) do 
         Instance:Destroy()
     end 
 
@@ -376,3 +379,14 @@ Library:Connect("PlayerRemoving", Players.PlayerRemoving, function(Player)
     end
 end)
 
+for i, v in ipairs(Players:GetPlayers()) do 
+    if v ~= LocalPlayer then 
+        table.insert(Library.Clients.All, v)
+
+        if Library:GetStatus(v) then 
+            table.insert(Library.Clients.Alive, v)
+        end 
+    end 
+end 
+
+return Library
