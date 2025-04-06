@@ -708,7 +708,8 @@ local library = {
     notification_y = "bottom",
     watermark_x = "left",
     watermark_y = "top",
-    info_position = "middle",
+    info_x = "right",
+    info_y = "top",
     font = worldtoscreen ~= nil and 1 or 2,
     font_size = 13,
     themes = {
@@ -3747,27 +3748,10 @@ end
 
 function library:ChangeInfoPosition(position)
     if self.Info then
-        local xOffset, yOffset
-
-        -- Handle position cases
-        if position == "top left corner" then
-            xOffset = 16
-            yOffset = 16
-        elseif position == "middle" then
-            xOffset = 16
-            yOffset = (workspace.CurrentCamera.ViewportSize.Y / 2) - (self.Info.AbsoluteSize.Y / 2)
-        elseif position == "bottom left corner" then
-            xOffset = 16
-            yOffset = workspace.CurrentCamera.ViewportSize.Y - self.Info.AbsoluteSize.Y - 16
-        else
-            xOffset = 16
-            yOffset = 16
-        end
-
-        -- Apply the calculated position
-        self.Info.Position = UDim2.new(0, xOffset, 0, yOffset)
+        self.Info.Position = newUDim2(self.info_x == "left" and 0 or 1, self.info_x == "left" and 16 or -(self.Info.AbsoluteSize.X + 16), self.info_y == "top" and 0 or 1, self.info_y == "top" and 16 or -36)
     end
 end
+
 function library:Watermark(str)
     self.watermark = Render:Create("Square", {
         Position = newUDim2(0, 16, 0, 16),
@@ -3833,7 +3817,7 @@ function library:Info(str, title, img)
 
     local image = self.Info:Create("Image", {
         Data = img or readfile("kalnmon3tr.png"),
-        Size = newUDim2(0, 135, 0, 135),
+        Size = Vector2.new(130, 130),
         ZIndex = 64,
         Position = newUDim2(0, 8, 0, 8) -- Adjusted for paddin
     })
@@ -3843,7 +3827,7 @@ function library:Info(str, title, img)
         Font = library.font,
         Size = library.font_size,
         Position = newUDim2(0, 150, 0, 8), -- Positioned to the right of the image
-        Theme = "Text",
+        Theme = "Accent",
         ZIndex = 64,
         Outline = true,
     }, true)
@@ -3875,9 +3859,9 @@ function library:Info(str, title, img)
         local yOffset = self.info_y == "top" and 16 or -(totalHeight + 16)
 
         self.Info.Position = UDim2.new(
-            1,
+            self.info_x == "left" and 0 or 1,
             xOffset,
-            1,
+            self.info_y == "top" and 0 or 1,
             yOffset
         )
     end
@@ -5376,7 +5360,7 @@ function library:Load(options)
         utility.format(tab_types, true)
         return tab_types
     end
-
+f
     function window_types:SettingsTab(watermark, info, unload)
         unload = unload or function() library:Unload() end
 
@@ -5590,11 +5574,15 @@ function library:Load(options)
 
             info_section:Dropdown{
                 name = "Client Info Alignment",
-                default = "Bottom Corner",
-                content = {"Top Left Corner", "Bottom Left Corner", "Middle"},
+                default = library.info_y:gsub("^%l", upper) .. " " .. library.info_x:gsub("^%l", upper),
+                content = {"Top Left", "Top Right", "Bottom Left", "Bottom Right"},
                 flag = "client_alignment",
                 callback = function(alignment)
-                    library:ChangeInfoPosition(string.lower(alignment))
+                    if alignment then
+                        alignment = alignment:split(" ")
+                        local y, x = alignment[1], alignment[2]
+                        library:ChangeInfoPosition(x, y)
+                    end
                 end
             }
         end
