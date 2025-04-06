@@ -3817,7 +3817,7 @@ function library:Info(str, title, img)
 
     local image = self.Info:Create("Image", {
         Data = img or readfile("kalnmon3tr.png"),
-        Size = Vector2.new(130, 130),
+        Size = newUDim2(0, 135, 0, 135),
         ZIndex = 64,
         Position = newUDim2(0, 8, 0, 8) -- Adjusted for paddin
     })
@@ -5360,7 +5360,7 @@ function library:Load(options)
         utility.format(tab_types, true)
         return tab_types
     end
-f
+
     function window_types:SettingsTab(watermark, info, unload)
         unload = unload or function() library:Unload() end
 
