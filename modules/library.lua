@@ -708,6 +708,7 @@ local library = {
     notification_y = "bottom",
     watermark_x = "left",
     watermark_y = "top",
+    info_position = "middle",
     font = worldtoscreen ~= nil and 1 or 2,
     font_size = 13,
     themes = {
@@ -2972,6 +2973,10 @@ function library:Unload(fade)
         self.watermark:Destroy()
     end
 
+    if (self.Info and typeof(self.Info) ~= "function") then 
+        self.Info:Destroy()
+    end 
+
     if (self.Playerlist) then
         self.Playerlist.object:Destroy()
     end
@@ -3354,8 +3359,8 @@ function library:Loader(options)
         callback = function() end,
     });
 
-    local sizeX = options.sizeX or 310;
-    local sizeY = options.sizeY or 123;
+    local sizeX = 310;
+    local sizeY = 123;
 
     local window = Render:Create("Square", {
         Size = newUDim2(0, sizeX, 0, 22),
@@ -3740,6 +3745,29 @@ function library:ChangeWatermarkPosition(x, y)
     end
 end
 
+function library:ChangeInfoPosition(position)
+    if self.Info then
+        local xOffset, yOffset
+
+        -- Handle position cases
+        if position == "top left corner" then
+            xOffset = 16
+            yOffset = 16
+        elseif position == "middle" then
+            xOffset = 16
+            yOffset = (workspace.CurrentCamera.ViewportSize.Y / 2) - (self.Info.AbsoluteSize.Y / 2)
+        elseif position == "bottom left corner" then
+            xOffset = 16
+            yOffset = workspace.CurrentCamera.ViewportSize.Y - self.Info.AbsoluteSize.Y - 16
+        else
+            xOffset = 16
+            yOffset = 16
+        end
+
+        -- Apply the calculated position
+        self.Info.Position = UDim2.new(0, xOffset, 0, yOffset)
+    end
+end
 function library:Watermark(str)
     self.watermark = Render:Create("Square", {
         Position = newUDim2(0, 16, 0, 16),
@@ -3784,6 +3812,92 @@ function library:Watermark(str)
 
     utility.format(watermark_types, true)
     return watermark_types
+end
+
+function library:Info(str, title, img)
+    self.Info = Render:Create("Square", {
+        Position = newUDim2(0, 16, 0, 16),
+        ZIndex = 63,
+        Visible = false,
+        Theme = "Window Background",
+        Outline = false
+    }, true)
+
+    self.Info:Create("Square", {
+        Size = newUDim2(1, 2, 1, 2),
+        Position = newUDim2(0, -1, 0, -1),
+        Theme = "Window Border",
+        ZIndex = 62,
+        OutlineTheme = "Black Border"
+    }, true)
+
+    local image = self.Info:Create("Image", {
+        Data = img or readfile("kalnmon3tr.png"),
+        Size = newUDim2(0, 135, 0, 135),
+        ZIndex = 64,
+        Position = newUDim2(0, 8, 0, 8) -- Adjusted for paddin
+    })
+
+    local titleText = self.Info:Create("Text", {
+        Text = title or "Title",
+        Font = library.font,
+        Size = library.font_size,
+        Position = newUDim2(0, 150, 0, 8), -- Positioned to the right of the image
+        Theme = "Text",
+        ZIndex = 64,
+        Outline = true,
+    }, true)
+
+    local contentText = self.Info:Create("Text", {
+        Text = str or "Content",
+        Font = library.font,
+        Size = library.font_size,
+        Position = newUDim2(0, 150, 0, 30), -- Positioned below the title
+        Theme = "Text",
+        ZIndex = 64,
+        Outline = true,
+    }, true)
+
+    local function updatePositions()
+        -- Dynamically calculate the size of the Info box
+        local totalWidth = math.max(image.Size.X.Offset + 27 + math.max(titleText.TextBounds.X, contentText.TextBounds.X), 16)
+        local totalHeight = math.max(image.Size.Y.Offset + 16, titleText.TextBounds.Y + contentText.TextBounds.Y + 24)
+
+        -- Update the size of the Info box
+        self.Info.Size = UDim2.new(0, totalWidth, 0, totalHeight)
+
+        -- Adjust text positions relative to the image
+        titleText.Position = UDim2.new(0, image.Size.X.Offset + 16, 0, 8) -- Right of the image, with padding
+        contentText.Position = UDim2.new(0, image.Size.X.Offset + 16, 0, titleText.Position.Y.Offset + titleText.TextBounds.Y + 4) -- Below the title, with padding
+
+        -- Reposition the Info box based on alignment
+        local xOffset = self.info_x == "left" and 16 or -(totalWidth + 16)
+        local yOffset = self.info_y == "top" and 16 or -(totalHeight + 16)
+
+        self.Info.Position = UDim2.new(
+            1,
+            xOffset,
+            1,
+            yOffset
+        )
+    end
+
+    local Info_types = {}
+
+    function Info_types:Toggle()
+        library.Info.Visible = not library.Info.Visible
+    end
+
+    function Info_types:Set(content, newTitle)
+        contentText.Text = content or ""
+        titleText.Text = newTitle or ""
+        updatePositions()
+    end
+
+    updatePositions()
+
+    utility.format(Info_types, true)
+    return Info_types
 end
 
 function library:List(options)
@@ -4322,7 +4436,7 @@ function library:Window(options)
     local window_types = {Visible = options.visible, tab = holder, tab_buttons = {}, text_bounds = 0, double_columns = options.doublecolumns, left_column = left_column};
     self.windows[window] = window_types;
 
-    --[[function window_types:SubTab(name)
+    function window_types:SubTab(name)
         self.has_subtabs = true
         local first = #self.tab:GetChildren() == 2
 
@@ -4391,7 +4505,7 @@ function library:Window(options)
         column_types.left_column = left_column
 
         return column_types
-    end]]
+    end
 
     function window_types:Section(options)
         if self.has_subtabs then return end
@@ -5263,8 +5377,8 @@ function library:Load(options)
         return tab_types
     end
 
-    function window_types:SettingsTab(watermark, unload)
-        unload = unload or function() library.unload(library) end
+    function window_types:SettingsTab(watermark, info, unload)
+        unload = unload or function() library:Unload() end
 
         local settings = self:Tab("Settings")
         local configs = settings:Section{name = "Configs"}
@@ -5459,6 +5573,32 @@ function library:Load(options)
             }
         end
 
+        if info then
+            local info_section = settings:Section{name = "Client Info"}
+            info:Toggle()
+
+            info_section:Toggle{
+                name = "Show Client Info",
+                default = true,
+                flag = "show_client",
+                callback = function(bool)
+                    if library.Info.Visible ~= bool then
+                        info:Toggle()
+                    end
+                end
+            }
+
+            info_section:Dropdown{
+                name = "Client Info Alignment",
+                default = "Bottom Corner",
+                content = {"Top Left Corner", "Bottom Left Corner", "Middle"},
+                flag = "client_alignment",
+                callback = function(alignment)
+                    library:ChangeInfoPosition(string.lower(alignment))
+                end
+            }
+        end
+
         local notifications_section = settings:Section{name = "Notifications"}
 
         notifications_section:Slider{
@@ -5634,4 +5774,5 @@ function library:Load(options)
 end
 
 utility.format(library, true)
-return library;
+
+return library
